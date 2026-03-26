@@ -128,6 +128,7 @@ export async function startDashboard() {
       await loadKnowledgeBase(true)
       res.json({ ok: true, ...result })
     } catch (error) {
+      logger.error(`KB ingest failed: ${error.stack || error.message}`)
       res.status(400).json({ error: error.message })
     }
   })

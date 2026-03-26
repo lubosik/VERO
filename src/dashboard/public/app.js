@@ -285,6 +285,7 @@ async function handleKbSubmit(event) {
 function fileType() {
   const file = document.getElementById('kb-file').files[0]
   if (!file) return 'txt'
+  if (file.name.toLowerCase().endsWith('.docx')) return 'docx'
   return file.name.toLowerCase().endsWith('.pdf') ? 'pdf' : 'txt'
 }
 

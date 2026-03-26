@@ -1,5 +1,6 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
+import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse'
 import { supabase } from '../db/supabase.js'
 import { embedQuery, embedTexts, toVectorLiteral } from '../services/embeddings.js'
@@ -220,22 +221,30 @@ export async function searchKnowledgeBase(query, limit = 6) {
 
 export async function ingestDocument({ name, sourceType, sourceUrl, buffer }) {
   let rawContent = ''
+  let stage = 'extract'
 
-  if (sourceType === 'pdf' && buffer) {
-    const parsed = await pdfParse(buffer)
-    rawContent = parsed.text
-  } else if (sourceType === 'txt' && buffer) {
-    rawContent = buffer.toString('utf-8')
-  } else if (sourceType === 'url' && sourceUrl) {
-    const { data: html } = await axios.get(sourceUrl, {
-      headers: { 'User-Agent': 'VERO-KB/1.0' },
-      timeout: 10000
-    })
-    const $ = cheerio.load(html)
-    $('script, style, nav, footer, header').remove()
-    rawContent = $('body').text().replace(/\s+/g, ' ').trim()
-  } else if (sourceType === 'paste' && buffer) {
-    rawContent = buffer.toString('utf-8')
+  try {
+    if (sourceType === 'pdf' && buffer) {
+      const parsed = await pdfParse(buffer)
+      rawContent = parsed.text
+    } else if (sourceType === 'txt' && buffer) {
+      rawContent = buffer.toString('utf-8')
+    } else if (sourceType === 'docx' && buffer) {
+      const parsed = await mammoth.extractRawText({ buffer })
+      rawContent = parsed.value
+    } else if (sourceType === 'url' && sourceUrl) {
+      const { data: html } = await axios.get(sourceUrl, {
+        headers: { 'User-Agent': 'VERO-KB/1.0' },
+        timeout: 10000
+      })
+      const $ = cheerio.load(html)
+      $('script, style, nav, footer, header').remove()
+      rawContent = $('body').text().replace(/\s+/g, ' ').trim()
+    } else if (sourceType === 'paste' && buffer) {
+      rawContent = buffer.toString('utf-8')
+    }
+  } catch (error) {
+    throw new Error(`Document extraction failed: ${error.message}`)
   }
 
   rawContent = normalizeText(rawContent)
@@ -244,6 +253,7 @@ export async function ingestDocument({ name, sourceType, sourceUrl, buffer }) {
     throw new Error('Could not extract meaningful content from source')
   }
 
+  stage = 'save_document'
   const wordCount = rawContent.trim().split(/\s+/).length
   const { data: inserted, error } = await supabase
     .from('knowledge_docs')
@@ -268,15 +278,24 @@ export async function ingestDocument({ name, sourceType, sourceUrl, buffer }) {
   let indexingWarning = null
   if (inserted?.id) {
     try {
+      stage = 'index_chunks'
       chunkCount = await replaceDocumentChunks(inserted.id, rawContent)
     } catch (error) {
-      indexingWarning = `Document saved, but chunk indexing failed: ${error.message}`
+      indexingWarning = `Document saved, but chunk indexing failed during ${stage}: ${error.message}`
       logger.warn(indexingWarning)
     }
   }
 
   cachedKB = null
   lastLoaded = null
-  await loadKnowledgeBase(true)
+  try {
+    stage = 'refresh_cache'
+    await loadKnowledgeBase(true)
+  } catch (error) {
+    indexingWarning = indexingWarning
+      ? `${indexingWarning} Cache refresh failed: ${error.message}`
+      : `Document saved, but cache refresh failed: ${error.message}`
+    logger.warn(indexingWarning)
+  }
   return { wordCount, chunkCount, warning: indexingWarning }
 }
