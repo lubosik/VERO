@@ -83,30 +83,23 @@ export async function startDashboard() {
     if (error) return res.status(500).json({ error: error.message })
     const docIds = (data || []).map((item) => item.id)
     let chunkCounts = new Map()
-    let indexedCounts = new Map()
 
     if (docIds.length) {
-      const { data: chunks } = await supabase.from('knowledge_chunks').select('doc_id, embedding').in('doc_id', docIds)
+      const { data: chunks } = await supabase.from('knowledge_chunks').select('doc_id').in('doc_id', docIds)
       chunkCounts = new Map()
       for (const chunk of chunks || []) {
         chunkCounts.set(chunk.doc_id, (chunkCounts.get(chunk.doc_id) || 0) + 1)
-        if (chunk.embedding) {
-          indexedCounts.set(chunk.doc_id, (indexedCounts.get(chunk.doc_id) || 0) + 1)
-        }
       }
     }
 
     res.json(
       (data || []).map((item) => {
         const chunkCount = chunkCounts.get(item.id) || 0
-        const indexedCount = indexedCounts.get(item.id) || 0
-        const indexingStatus =
-          chunkCount === 0 ? 'pending' : indexedCount === 0 ? 'lexical_fallback' : indexedCount === chunkCount ? 'semantic' : 'partial'
+        const indexingStatus = chunkCount === 0 ? 'pending' : 'lexical'
 
         return {
           ...item,
           chunk_count: chunkCount,
-          indexed_chunk_count: indexedCount,
           indexing_status: indexingStatus
         }
       })

@@ -3,8 +3,6 @@ import * as cheerio from 'cheerio'
 import mammoth from 'mammoth'
 import pdfParse from 'pdf-parse'
 import { supabase } from '../db/supabase.js'
-import { embedQuery, embedTexts, toVectorLiteral } from '../services/embeddings.js'
-import { rerankPassages } from '../services/reranker.js'
 import { logger } from '../utils/logger.js'
 
 let cachedKB = null
@@ -53,28 +51,13 @@ function chunkText(rawContent) {
 async function replaceDocumentChunks(docId, rawContent) {
   const chunks = chunkText(rawContent)
   if (!chunks.length) return 0
-  let embeddings = null
 
-  try {
-    embeddings = await embedTexts(chunks, 'passage')
-  } catch (error) {
-    logger.warn(`Chunk embedding failed for doc ${docId}; storing lexical-only chunks: ${error.message}`)
-  }
-
-  const rows = chunks.map((content, index) => {
-    const row = {
-      doc_id: docId,
-      chunk_index: index,
-      content,
-      token_estimate: Math.ceil(content.split(/\s+/).length * 1.35)
-    }
-
-    if (embeddings?.[index]) {
-      row.embedding = toVectorLiteral(embeddings[index])
-    }
-
-    return row
-  })
+  const rows = chunks.map((content, index) => ({
+    doc_id: docId,
+    chunk_index: index,
+    content,
+    token_estimate: Math.ceil(content.split(/\s+/).length * 1.35)
+  }))
 
   const { error: deleteError } = await supabase.from('knowledge_chunks').delete().eq('doc_id', docId)
   if (deleteError && !String(deleteError.message || '').includes('knowledge_chunks')) throw deleteError
@@ -147,46 +130,6 @@ export async function ensureKnowledgeBaseIndexed() {
 }
 
 export async function searchKnowledgeBase(query, limit = 6) {
-  try {
-    const embedding = await embedQuery(query)
-    const { data, error } = await supabase.rpc('match_knowledge_chunks', {
-      query_embedding: toVectorLiteral(embedding),
-      match_count: Math.max(limit * 2, 10)
-    })
-
-    if (error) throw error
-
-    if (data?.length) {
-      let ranked = data.filter((item) => Number(item.similarity || 0) > 0.2)
-
-      try {
-        const reranked = await rerankPassages(
-          query,
-          ranked.map((item) => item.content)
-        )
-
-        ranked = reranked
-          .map((entry) => ({
-            ...ranked[entry.index],
-            rerankScore: entry.score
-          }))
-          .sort((a, b) => Number(b.rerankScore || 0) - Number(a.rerankScore || 0))
-      } catch (error) {
-        logger.warn(`KB reranking failed, using vector order: ${error.message}`)
-      }
-
-      return ranked
-        .slice(0, limit)
-        .map(
-          (item, index) =>
-            `[KB ${index + 1} | similarity ${Number(item.similarity).toFixed(2)}${item.rerankScore !== undefined ? ` | rerank ${Number(item.rerankScore).toFixed(2)}` : ''}]\n${item.content}`
-        )
-        .join('\n\n')
-    }
-  } catch (error) {
-    logger.warn(`Semantic KB search failed, falling back to cached docs: ${error.message}`)
-  }
-
   try {
     const { data: chunks, error } = await supabase
       .from('knowledge_chunks')

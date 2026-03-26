@@ -87,7 +87,8 @@ export async function runBlogEngine() {
     )
 
     const html = await generateWithSearch(`You are an expert peptide researcher writing a blog post for Vici Peptides (vicipeptides.com).
-You have web search access — use it to find recent studies, news, or data not in the knowledge base.
+You have web search access, use it to find recent studies, news, or data not in the knowledge base.
+Never use em dashes in any output. Use commas, periods, or rewrite the sentence instead.
 
 Primary keyword: ${primary.keyword}
 Secondary keywords: ${secondaryA.keyword}, ${secondaryB.keyword}
@@ -104,7 +105,7 @@ Write a comprehensive, educational blog post. Output as HTML article body only.
 <article>
   <p class="disclaimer"><em>For research and educational purposes only. Not FDA-approved. Always consult a qualified healthcare professional before beginning any research protocol.</em></p>
 
-  <h1>{Title — includes primary keyword, compelling, not clickbait}</h1>
+  <h1>{Title, includes primary keyword, compelling, not clickbait}</h1>
 
   <p>{Hook: open with a striking research stat or finding. 2-3 sentences.}</p>
 
@@ -115,7 +116,7 @@ Write a comprehensive, educational blog post. Output as HTML article body only.
   <p>{Specific findings, exact percentages and stats from the knowledge base. Use web search to supplement with any recent studies published after the guide.}</p>
 
   <h2>Research Protocol & Dosing</h2>
-  <p>{Dosing ranges, frequency, administration route — from the guide}</p>
+  <p>{Dosing ranges, frequency, administration route, from the guide}</p>
 
   <h2>Stacking & Combinations</h2>
   <p>{Synergistic compounds, protocol combinations from the guide}</p>
@@ -124,14 +125,14 @@ Write a comprehensive, educational blog post. Output as HTML article body only.
   <p>{Safety notes, contraindications, monitoring advice from the guide}</p>
 
   <h2>Sourcing Quality Compounds</h2>
-  <p>{Natural mention of Vici Peptides — pharmaceutical-grade, third-party tested, >99% purity. Link to vicipeptides.com. Mention free research guide at ${process.env.GUIDE_URL}. Mention 1-on-1 consult at ${process.env.CONSULT_URL}.}</p>
+  <p>{Natural mention of Vici Peptides, pharmaceutical-grade, third-party tested, >99% purity. Link to vicipeptides.com. Mention free research guide at ${process.env.GUIDE_URL}. Mention 1-on-1 consult at ${process.env.CONSULT_URL}.}</p>
 
   <h2>Frequently Asked Questions</h2>
   <details><summary>{keyword-optimised question 1}</summary><p>{answer}</p></details>
   <details><summary>{keyword-optimised question 2}</summary><p>{answer}</p></details>
   <details><summary>{keyword-optimised question 3}</summary><p>{answer}</p></details>
 
-  <p>{Conclusion — summarise key points, soft CTA to vicipeptides.com}</p>
+  <p>{Conclusion, summarise key points, soft CTA to vicipeptides.com}</p>
 </article>
 
 SEO rules: primary keyword in H1, first 100 words, 2+ H2s, conclusion. No stuffing.
