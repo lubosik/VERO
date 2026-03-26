@@ -151,6 +151,7 @@ function renderKb(items) {
         <td>${item.name}</td>
         <td>${item.source_type}</td>
         <td>${item.word_count || 0}</td>
+        <td>${item.chunk_count || 0}</td>
         <td>${formatDate(item.uploaded_at)}</td>
         <td><button data-toggle-kb="${item.id}">${item.active ? 'On' : 'Off'}</button></td>
         <td><button data-delete-kb="${item.id}">Delete</button></td>
@@ -249,7 +250,7 @@ async function handleKbSubmit(event) {
 
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Ingest failed')
-  document.getElementById('kb-result').textContent = `Loaded ${data.wordCount} words`
+  document.getElementById('kb-result').textContent = `Loaded ${data.wordCount} words into ${data.chunkCount || 0} chunks`
   event.target.reset()
   updateFilePreview()
   await loadDashboard()

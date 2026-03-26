@@ -81,7 +81,18 @@ export async function startDashboard() {
   app.get('/api/kb', async (_req, res) => {
     const { data, error } = await supabase.from('knowledge_docs').select('*').order('uploaded_at', { ascending: false })
     if (error) return res.status(500).json({ error: error.message })
-    res.json(data)
+    const docIds = (data || []).map((item) => item.id)
+    let chunkCounts = new Map()
+
+    if (docIds.length) {
+      const { data: chunks } = await supabase.from('knowledge_chunks').select('doc_id').in('doc_id', docIds)
+      chunkCounts = new Map()
+      for (const chunk of chunks || []) {
+        chunkCounts.set(chunk.doc_id, (chunkCounts.get(chunk.doc_id) || 0) + 1)
+      }
+    }
+
+    res.json((data || []).map((item) => ({ ...item, chunk_count: chunkCounts.get(item.id) || 0 })))
   })
 
   app.post('/api/kb/ingest', upload.single('file'), async (req, res) => {

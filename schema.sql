@@ -1,4 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
+CREATE EXTENSION IF NOT EXISTS vector;
 
 ALTER TABLE comments
   ADD COLUMN IF NOT EXISTS channel_id TEXT,
@@ -89,5 +90,47 @@ CREATE TABLE IF NOT EXISTS knowledge_docs (
   active BOOLEAN DEFAULT TRUE
 );
 
+CREATE TABLE IF NOT EXISTS knowledge_chunks (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  doc_id UUID NOT NULL REFERENCES knowledge_docs(id) ON DELETE CASCADE,
+  chunk_index INTEGER NOT NULL,
+  content TEXT NOT NULL,
+  token_estimate INTEGER,
+  embedding VECTOR(1024),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(doc_id, chunk_index)
+);
+
 CREATE INDEX IF NOT EXISTS knowledge_docs_uploaded_at_idx ON knowledge_docs (uploaded_at DESC);
 CREATE INDEX IF NOT EXISTS knowledge_docs_active_idx ON knowledge_docs (active);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_doc_idx ON knowledge_chunks (doc_id);
+CREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_idx
+ON knowledge_chunks
+USING ivfflat (embedding vector_cosine_ops)
+WITH (lists = 100);
+
+CREATE OR REPLACE FUNCTION match_knowledge_chunks(
+  query_embedding VECTOR(1024),
+  match_count INT DEFAULT 8
+)
+RETURNS TABLE (
+  id UUID,
+  doc_id UUID,
+  chunk_index INTEGER,
+  content TEXT,
+  similarity DOUBLE PRECISION
+)
+LANGUAGE SQL
+STABLE
+AS $$
+  SELECT
+    knowledge_chunks.id,
+    knowledge_chunks.doc_id,
+    knowledge_chunks.chunk_index,
+    knowledge_chunks.content,
+    1 - (knowledge_chunks.embedding <=> query_embedding) AS similarity
+  FROM knowledge_chunks
+  WHERE knowledge_chunks.embedding IS NOT NULL
+  ORDER BY knowledge_chunks.embedding <=> query_embedding
+  LIMIT match_count;
+$$;

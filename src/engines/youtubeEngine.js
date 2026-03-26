@@ -1,4 +1,4 @@
-import { loadKnowledgeBase } from '../knowledge/loader.js'
+import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { scrapeYouTubeComments, formatCommentsForPrompt } from '../services/apify.js'
 import { generateJson, generateText } from '../services/gemini.js'
 import { sendTelegramMessage } from '../services/telegram.js'
@@ -64,7 +64,7 @@ function scoreVideo(video, detail) {
   return score
 }
 
-function buildPrompt({ video, detail, knowledgeBase, commentContext, guideUrl }) {
+function buildPrompt({ video, detail, knowledgeContext, commentContext, guideUrl }) {
   return `You are a member of the Vici Peptides research team commenting on a YouTube video.
 You post from the official Vici Peptides channel — your name is visible on the comment, so never mention the brand name in the body.
 
@@ -75,8 +75,8 @@ Description: ${(detail?.snippet?.description || '').slice(0, 1000)}
 WHAT PEOPLE ARE ALREADY SAYING IN THE COMMENTS:
 ${commentContext}
 
-KNOWLEDGE BASE (Vici Research Guide + Transcripts):
-${knowledgeBase}
+RELEVANT KNOWLEDGE BASE EXCERPTS:
+${knowledgeContext}
 
 Your task:
 1. Read the existing comments carefully. Identify:
@@ -119,8 +119,6 @@ export async function runYouTubeEngine() {
     return
   }
 
-  const knowledgeBase = await loadKnowledgeBase()
-
   for (const query of SEARCH_QUERIES) {
     const results = await searchVideos(query, 5)
 
@@ -136,12 +134,20 @@ export async function runYouTubeEngine() {
       const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
       const scrapedComments = await scrapeYouTubeComments(videoUrl, 150)
       const commentContext = formatCommentsForPrompt(scrapedComments, 20)
+      const knowledgeContext = await searchKnowledgeBase(
+        [
+          detail?.snippet?.title || video.snippet?.title || '',
+          detail?.snippet?.description?.slice(0, 500) || '',
+          query,
+          scrapedComments.slice(0, 5).map((item) => item.text).join(' ')
+        ].join('\n')
+      )
 
       const comment = await generateText(
         buildPrompt({
           video,
           detail,
-          knowledgeBase,
+          knowledgeContext,
           commentContext,
           guideUrl: process.env.GUIDE_URL
         }),

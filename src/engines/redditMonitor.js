@@ -1,7 +1,7 @@
 import axios from 'axios'
 import { hasRedditApiCredentials } from '../config.js'
 import { supabase } from '../db/supabase.js'
-import { loadKnowledgeBase } from '../knowledge/loader.js'
+import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { generateText } from '../services/gemini.js'
 import { sendTelegramMessage } from '../services/telegram.js'
 import { hasExistingComment } from '../utils/dedup.js'
@@ -38,7 +38,7 @@ function scorePost(post) {
   return score
 }
 
-function buildPrompt({ post, subreddit, knowledgeBase }) {
+function buildPrompt({ post, subreddit, knowledgeContext }) {
   return `You are a knowledgeable peptide researcher replying to a Reddit post.
 You are a regular community member — do NOT represent any brand or company.
 
@@ -46,8 +46,8 @@ Post title: ${post.title}
 Post content: ${post.selftext || '(no body text)'}
 Subreddit: r/${subreddit}
 
-KNOWLEDGE BASE:
-${knowledgeBase}
+RELEVANT KNOWLEDGE BASE EXCERPTS:
+${knowledgeContext}
 
 Instructions:
 1. Write a genuinely helpful reply grounded in real data from the knowledge base
@@ -69,7 +69,6 @@ Output ONLY the comment text.`
 
 export async function runRedditMonitor() {
   global.runtimeState ||= { health: { lastRuns: {}, errors: [] }, stats: {} }
-  const knowledgeBase = await loadKnowledgeBase()
   const autonomous = hasRedditApiCredentials()
 
   for (const subreddit of SUBREDDITS) {
@@ -85,9 +84,13 @@ export async function runRedditMonitor() {
         if (await hasExistingComment({ platform: 'reddit', externalId })) continue
         const intentScore = scorePost(post)
         if (intentScore < 60) continue
+        const knowledgeContext = await searchKnowledgeBase(
+          `${post.title}\n${post.selftext || ''}\nr/${subreddit}`,
+          8
+        )
 
         const generatedComment = await generateText(
-          buildPrompt({ post, subreddit, knowledgeBase }),
+          buildPrompt({ post, subreddit, knowledgeContext }),
           { temperature: 0.8, maxOutputTokens: 500 }
         )
 

@@ -1,5 +1,5 @@
 import { supabase } from '../db/supabase.js'
-import { loadKnowledgeBase } from '../knowledge/loader.js'
+import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { fetchKeywordIdeas } from '../services/dataforseo.js'
 import { generateText } from '../services/gemini.js'
 import { sendTelegramDocument, sendTelegramMessage } from '../services/telegram.js'
@@ -80,8 +80,11 @@ export async function runBlogEngine() {
       return
     }
 
-    const knowledgeBase = await loadKnowledgeBase()
     const [primary, secondaryA, secondaryB] = keywords
+    const knowledgeContext = await searchKnowledgeBase(
+      `${primary.keyword}\n${secondaryA.keyword}\n${secondaryB.keyword}`,
+      10
+    )
 
     const html = await generateText(`You are an expert peptide researcher writing a blog post for Vici Peptides (vicipeptides.com).
 You have web search access — use it to find recent studies, news, or data not in the knowledge base.
@@ -90,8 +93,8 @@ Primary keyword: ${primary.keyword}
 Secondary keywords: ${secondaryA.keyword}, ${secondaryB.keyword}
 Target: 1500-2000 words
 
-KNOWLEDGE BASE:
-${knowledgeBase}
+RELEVANT KNOWLEDGE BASE EXCERPTS:
+${knowledgeContext}
 
 Write a comprehensive, educational blog post. Output as HTML article body only.
 

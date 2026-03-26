@@ -1,5 +1,5 @@
 import cron from 'node-cron'
-import { loadKnowledgeBase } from './knowledge/loader.js'
+import { ensureKnowledgeBaseIndexed, loadKnowledgeBase } from './knowledge/loader.js'
 import { runYouTubeEngine } from './engines/youtubeEngine.js'
 import { runBlogEngine } from './engines/blogEngine.js'
 import { runRedditMonitor } from './engines/redditMonitor.js'
@@ -34,6 +34,7 @@ async function main() {
 
   await safeRun('knowledge-base', async () => {
     await loadKnowledgeBase()
+    await ensureKnowledgeBaseIndexed()
     logger.info('Knowledge base ready')
   })
 
