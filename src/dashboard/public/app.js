@@ -191,9 +191,21 @@ function renderHealth(health) {
     ['YT Quota Used Today', health.youtubeQuotaUsedToday || 0],
     ['Recent Errors', (health.recentErrors || []).length]
   ]
-  document.getElementById('health-panel').innerHTML = cards
+  const summary = cards
     .map(([label, value]) => `<div class="health-card"><div class="stat-label">${label}</div><div class="stat-value" style="font-size:22px">${value}</div></div>`)
     .join('')
+
+  const errors = (health.recentErrors || [])
+    .slice(0, 4)
+    .map(
+      (item) => `<div class="health-card">
+        <div class="stat-label">${item.engine || 'system'}</div>
+        <div class="muted">${truncate(item.message || 'Unknown error', 160)}</div>
+      </div>`
+    )
+    .join('')
+
+  document.getElementById('health-panel').innerHTML = summary + errors
 }
 
 async function loadDashboard() {
@@ -263,7 +275,11 @@ async function handleKbSubmit(event) {
     : `Loaded ${data.wordCount} words into ${data.chunkCount || 0} chunks`
   event.target.reset()
   updateFilePreview()
-  await loadDashboard()
+  try {
+    await loadDashboard()
+  } catch (error) {
+    document.getElementById('kb-result').textContent += ` Dashboard refresh warning: ${error.message}`
+  }
 }
 
 function fileType() {
