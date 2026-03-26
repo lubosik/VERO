@@ -104,10 +104,6 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
 CREATE INDEX IF NOT EXISTS knowledge_docs_uploaded_at_idx ON knowledge_docs (uploaded_at DESC);
 CREATE INDEX IF NOT EXISTS knowledge_docs_active_idx ON knowledge_docs (active);
 CREATE INDEX IF NOT EXISTS knowledge_chunks_doc_idx ON knowledge_chunks (doc_id);
-CREATE INDEX IF NOT EXISTS knowledge_chunks_embedding_idx
-ON knowledge_chunks
-USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
 
 CREATE OR REPLACE FUNCTION match_knowledge_chunks(
   query_embedding VECTOR(2048),
