@@ -9,6 +9,7 @@ import { sendTelegramMessage } from '../services/telegram.js'
 import { canPost, incrementCap, shouldNotifyCap } from '../utils/dailyCap.js'
 import { isRecent } from '../utils/recencyCheck.js'
 import { logger } from '../utils/logger.js'
+import { trackMetric } from '../utils/runtimeMetrics.js'
 
 const client = config.APIFY_API_KEY ? new ApifyClient({ token: config.APIFY_API_KEY }) : null
 
@@ -72,6 +73,7 @@ export async function runTikTokMonitor() {
   if (!client) return
 
   if (!canPost('tiktok')) {
+    trackMetric('tiktok', { capSkipped: 1, lastError: 'daily cap reached' })
     if (shouldNotifyCap('tiktok')) {
       await sendTelegramMessage('📊 Daily cap reached: tiktok (15 actions). Resuming tomorrow.')
     }
@@ -95,13 +97,18 @@ export async function runTikTokMonitor() {
         const videoUrl = post?.webVideoUrl || post?.url || post?.videoUrl
         const timestamp = extractTimestamp(post)
         if (!id || !videoUrl) continue
+        const description = getDescription(post)
+        trackMetric('tiktok', {
+          processed: 1,
+          lastItem: { id, title: description || id, url: videoUrl }
+        })
         if (!isRecent(timestamp, 14)) {
           logger.info(`Skipped ${id}: missing or stale timestamp`)
+          trackMetric('tiktok', { staleSkipped: 1 })
           continue
         }
         if (await hasScanned(id)) continue
 
-        const description = getDescription(post)
         const score = scoreVideo(post, description, true, true)
         if (score < 55) continue
 
@@ -184,9 +191,11 @@ ${generatedComment}
           }
         )
         incrementCap('tiktok')
+        trackMetric('tiktok', { queued: 1 })
       }
     } catch (error) {
       logger.error(`TikTok monitor failed for query "${query}": ${error.message}`)
+      trackMetric('tiktok', { errors: 1, lastError: error.message })
       global.runtimeState.health.errors.unshift({
         engine: 'tiktok',
         message: error.message,

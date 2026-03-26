@@ -13,10 +13,11 @@ if (config.YOUTUBE_OAUTH_REFRESH_TOKEN) {
   })
 }
 
-const youtube = google.youtube({ version: 'v3', auth: oauth2Client })
+const youtubeRead = google.youtube({ version: 'v3', auth: config.YOUTUBE_API_KEY })
+const youtubeWrite = google.youtube({ version: 'v3', auth: oauth2Client })
 
 export async function searchVideos(query, maxResults = 15) {
-  const res = await youtube.search.list({
+  const res = await youtubeRead.search.list({
     part: ['snippet'],
     q: query,
     type: ['video'],
@@ -30,7 +31,7 @@ export async function searchVideos(query, maxResults = 15) {
 }
 
 export async function getVideoDetails(videoId) {
-  const res = await youtube.videos.list({
+  const res = await youtubeRead.videos.list({
     part: ['snippet', 'statistics', 'status'],
     id: [videoId]
   })
@@ -38,7 +39,7 @@ export async function getVideoDetails(videoId) {
 }
 
 export async function postComment(videoId, commentText) {
-  const res = await youtube.commentThreads.insert({
+  const res = await youtubeWrite.commentThreads.insert({
     part: ['snippet'],
     requestBody: {
       snippet: {

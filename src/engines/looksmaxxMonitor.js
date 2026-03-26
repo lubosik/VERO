@@ -8,6 +8,7 @@ import { sendTelegramMessage } from '../services/telegram.js'
 import { canPost, incrementCap, shouldNotifyCap } from '../utils/dailyCap.js'
 import { isRecent } from '../utils/recencyCheck.js'
 import { logger } from '../utils/logger.js'
+import { trackMetric } from '../utils/runtimeMetrics.js'
 
 const BASE_URL = 'https://forum.looksmaxxing.com'
 const HEADERS = { 'User-Agent': 'VERO-Monitor/1.0' }
@@ -157,6 +158,7 @@ export async function runLooksmaxxMonitor() {
   global.runtimeState ||= { health: { lastRuns: {}, errors: [] }, stats: {} }
 
   if (!canPost('looksmaxxing')) {
+    trackMetric('looksmaxxing', { capSkipped: 1, lastError: 'daily cap reached' })
     if (shouldNotifyCap('looksmaxxing')) {
       await sendTelegramMessage('📊 Daily cap reached: looksmaxxing (15 actions). Resuming tomorrow.')
     }
@@ -169,10 +171,17 @@ export async function runLooksmaxxMonitor() {
     try {
       if (!canPost('looksmaxxing')) break
       if (!seed.id || await hasProcessedThread(seed.id)) continue
+      trackMetric('looksmaxxing', {
+        processed: 1,
+        lastItem: { id: seed.id, title: seed.title, url: seed.url }
+      })
 
       const context = await fetchThreadContext(seed.url)
       const thread = { ...seed, body: context.body || seed.body, publishedAt: context.publishedAt || seed.publishedAt }
-      if (!isRecent(thread.publishedAt, 7)) continue
+      if (!isRecent(thread.publishedAt, 7)) {
+        trackMetric('looksmaxxing', { staleSkipped: 1 })
+        continue
+      }
 
       const matchedKeywords = findKeywords(`${thread.title}\n${thread.body}`)
       const authorIsNew = !(await hasSeenAuthor(thread.author))
@@ -237,8 +246,10 @@ Post preview:
         }
       )
       incrementCap('looksmaxxing')
+      trackMetric('looksmaxxing', { queued: 1 })
     } catch (error) {
       logger.error(`Looksmaxxing monitor failed for ${seed?.url || 'thread'}: ${error.message}`)
+      trackMetric('looksmaxxing', { errors: 1, lastError: error.message })
       global.runtimeState.health.errors.unshift({
         engine: 'looksmaxxing',
         message: error.message,

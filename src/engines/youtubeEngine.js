@@ -7,6 +7,7 @@ import { getVideoDetails, postComment, searchVideos } from '../services/youtube.
 import { isRecent } from '../utils/recencyCheck.js'
 import { hasExistingComment, logComment } from '../utils/dedup.js'
 import { logger } from '../utils/logger.js'
+import { trackMetric } from '../utils/runtimeMetrics.js'
 
 const SEARCH_QUERIES = [
   'BPC-157 results experience',
@@ -110,6 +111,7 @@ export async function runYouTubeEngine() {
   global.runtimeState ||= { youtube: {}, stats: {}, health: { lastRuns: {}, errors: [] } }
   if (!canPost('youtube')) {
     logger.info('YouTube daily limit reached')
+    trackMetric('youtube', { capSkipped: 1, lastError: 'daily cap reached' })
     if (shouldNotifyCap('youtube')) {
       await sendTelegramMessage('📊 Daily cap reached: youtube (12 actions). Resuming tomorrow.')
     }
@@ -123,11 +125,20 @@ export async function runYouTubeEngine() {
       for (const video of results) {
         const videoId = video.id?.videoId
         if (!videoId) continue
+        trackMetric('youtube', {
+          processed: 1,
+          lastItem: {
+            id: videoId,
+            title: video.snippet?.title || '',
+            url: `https://www.youtube.com/watch?v=${videoId}`
+          }
+        })
         if (await hasExistingComment({ platform: 'youtube', videoId })) continue
 
         const detail = await getVideoDetails(videoId)
         if (!isRecent(video.snippet?.publishedAt, 30)) {
           logger.info(`YouTube: skipped stale video ${videoId}`)
+          trackMetric('youtube', { staleSkipped: 1 })
           continue
         }
         const score = scoreVideo(video, detail)
@@ -177,6 +188,7 @@ export async function runYouTubeEngine() {
           const capState = incrementCap('youtube')
           global.runtimeState.youtube.commentsToday = capState.count
           global.runtimeState.health.lastRuns.youtube = new Date().toISOString()
+          trackMetric('youtube', { posted: 1 })
           await sendTelegramMessage(`✅ Commented on YouTube\n${detail?.snippet?.title || video.snippet?.title}`)
           return
         } catch (error) {
@@ -186,7 +198,16 @@ export async function runYouTubeEngine() {
             message: error.message,
             at: new Date().toISOString()
           })
-          await sendTelegramMessage(`⚠️ YouTube API error. Pausing for 3 hours.\n${error.message}`)
+          trackMetric('youtube', { errors: 1, lastError: error.message })
+          if (/invalid_client/i.test(String(error.message || ''))) {
+            global.enginePausedUntil = Date.now() + 1000 * 60 * 60 * 12
+            if (!global.youtubeOAuthAlertUntil || global.youtubeOAuthAlertUntil < Date.now()) {
+              global.youtubeOAuthAlertUntil = Date.now() + 1000 * 60 * 60 * 12
+              await sendTelegramMessage('⚠️ YouTube OAuth refresh failed with invalid_client. Check the OAuth client ID, secret, redirect URI, and refresh token in Railway. YouTube engine paused for 12 hours.')
+            }
+          } else {
+            await sendTelegramMessage(`⚠️ YouTube API error. Pausing for 3 hours.\n${error.message}`)
+          }
           logger.error(`YouTube engine failed: ${error.message}`)
           return
         }
@@ -196,7 +217,11 @@ export async function runYouTubeEngine() {
     const message = String(error?.message || error)
     if (/invalid_client/i.test(message)) {
       global.enginePausedUntil = Date.now() + 1000 * 60 * 60 * 12
-      await sendTelegramMessage('⚠️ YouTube OAuth refresh failed with invalid_client. Check the OAuth client ID, secret, redirect URI, and refresh token in Railway. YouTube engine paused for 12 hours.')
+      trackMetric('youtube', { errors: 1, lastError: message })
+      if (!global.youtubeOAuthAlertUntil || global.youtubeOAuthAlertUntil < Date.now()) {
+        global.youtubeOAuthAlertUntil = Date.now() + 1000 * 60 * 60 * 12
+        await sendTelegramMessage('⚠️ YouTube OAuth refresh failed with invalid_client. Check the OAuth client ID, secret, redirect URI, and refresh token in Railway. YouTube engine paused for 12 hours.')
+      }
     }
     throw error
   }

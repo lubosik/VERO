@@ -7,6 +7,7 @@ import { sendTelegramMessage } from '../services/telegram.js'
 import { canPost, incrementCap, shouldNotifyCap } from '../utils/dailyCap.js'
 import { isRecent } from '../utils/recencyCheck.js'
 import { logger } from '../utils/logger.js'
+import { trackMetric } from '../utils/runtimeMetrics.js'
 
 const REDDIT_HEADERS = { 'User-Agent': 'VERO-Monitor/1.0' }
 
@@ -316,6 +317,7 @@ Post preview:
   )
   if (error && !String(error.message || '').includes('seen_authors')) throw error
   incrementCap('reddit')
+  trackMetric('reddit', { queued: 1 })
   return true
 }
 
@@ -354,6 +356,7 @@ export async function runRedditMonitor() {
   global.runtimeState ||= { health: { lastRuns: {}, errors: [] }, stats: {} }
 
   if (!canPost('reddit')) {
+    trackMetric('reddit', { capSkipped: 1, lastError: 'daily cap reached' })
     if (shouldNotifyCap('reddit')) {
       await sendTelegramMessage('📊 Daily cap reached: reddit (20 actions). Resuming tomorrow.')
     }
@@ -367,7 +370,14 @@ export async function runRedditMonitor() {
       for (const post of posts) {
         if (!canPost('reddit')) break
         if (!post?.id || await hasProcessedPost(post.id)) continue
-        if (!isRecent(post.created_utc, 1)) continue
+        trackMetric('reddit', {
+          processed: 1,
+          lastItem: { id: post.id, title: post.title, url: `https://www.reddit.com${post.permalink}` }
+        })
+        if (!isRecent(post.created_utc, 1)) {
+          trackMetric('reddit', { staleSkipped: 1 })
+          continue
+        }
 
         const matchedKeywords = extractMatchedKeywords(`${post.title}\n${post.selftext || ''}`)
         const authorIsNew = !(await hasSeenAuthor(post.author))
@@ -407,11 +417,13 @@ export async function runRedditMonitor() {
           topComments
         })
         incrementCap('reddit')
+        trackMetric('reddit', { queued: 1 })
 
         await processCommenterLeads({ post, subreddit, comments: topComments, knowledgeContext })
       }
     } catch (error) {
       logger.error(`Reddit monitor failed for r/${subreddit}: ${error.message}`)
+      trackMetric('reddit', { errors: 1, lastError: `r/${subreddit}: ${error.message}` })
       global.runtimeState.health.errors.unshift({
         engine: 'reddit',
         message: `r/${subreddit}: ${error.message}`,

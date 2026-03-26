@@ -195,7 +195,8 @@ export async function startDashboard() {
       lastRuns: global.runtimeState?.health?.lastRuns || {},
       youtubeQuotaUsedToday: getCaps().youtube.count,
       recentErrors: global.runtimeState?.health?.errors?.slice(0, 20) || [],
-      instagram: 'Handled via ManyChat (external)'
+      instagram: 'Handled via ManyChat (external)',
+      metrics: global.runtimeState?.metrics || {}
     })
   })
 

@@ -219,6 +219,22 @@ function renderHealth(health, caps) {
     <div class="muted">${health.instagram || 'Handled via ManyChat (external)'}</div>
   </div>`
 
+  const metricCards = ['youtube', 'reddit', 'looksmaxxing', 'tiktok']
+    .map((platform) => {
+      const item = health.metrics?.[platform]
+      if (!item) return ''
+      return `<div class="health-card">
+        <div class="stat-label">${prettifyPlatform(platform)} Metrics</div>
+        <div class="muted">Processed: ${item.processed || 0}</div>
+        <div class="muted">Queued/posted: ${(item.queued || 0) + (item.posted || 0)}</div>
+        <div class="muted">Stale skipped: ${item.staleSkipped || 0}</div>
+        <div class="muted">Cap skipped: ${item.capSkipped || 0}</div>
+        <div class="muted">Errors: ${item.errors || 0}</div>
+        <div class="muted">Last item: ${truncate(item.lastItem?.title || item.lastItem?.id || 'n/a', 60)}</div>
+      </div>`
+    })
+    .join('')
+
   const errors = (health.recentErrors || [])
     .slice(0, 4)
     .map(
@@ -229,7 +245,7 @@ function renderHealth(health, caps) {
     )
     .join('')
 
-  document.getElementById('health-panel').innerHTML = summary + capCard + instagramCard + errors
+  document.getElementById('health-panel').innerHTML = summary + capCard + instagramCard + metricCards + errors
 }
 
 async function loadDashboard() {

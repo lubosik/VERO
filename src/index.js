@@ -9,6 +9,7 @@ import { startDashboard } from './dashboard/server.js'
 import { initTelegram } from './services/telegram.js'
 import { getTikTokHashtagTrends } from './services/tiktok.js'
 import { getCaps, resetAllCaps } from './utils/dailyCap.js'
+import { ensureRuntimeMetrics, resetRuntimeMetrics, trackMetric } from './utils/runtimeMetrics.js'
 import { logger } from './utils/logger.js'
 
 async function safeRun(name, runner) {
@@ -16,11 +17,14 @@ async function safeRun(name, runner) {
     await runner()
   } catch (error) {
     global.runtimeState ||= { youtube: { commentsToday: 0 }, stats: {}, health: { lastRuns: {}, errors: [] } }
+    ensureRuntimeMetrics()
     global.runtimeState.health.errors.unshift({
       engine: name,
       message: error.message,
       at: new Date().toISOString()
     })
+    const metricKey = name === 'knowledge-base' ? 'knowledgeBase' : name
+    trackMetric(metricKey, { errors: 1, lastError: error.message })
     logger.error(`${name} run failed: ${error.stack || error.message}`)
   }
 }
@@ -31,6 +35,7 @@ async function main() {
     stats: {},
     health: { lastRuns: {}, errors: [] }
   }
+  ensureRuntimeMetrics()
   global.enginePausedUntil = 0
   const version = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || 'local'
 
@@ -75,6 +80,8 @@ async function main() {
 
   cron.schedule('0 0 * * *', async () => {
     resetAllCaps()
+    resetRuntimeMetrics()
+    ensureRuntimeMetrics()
     global.runtimeState.youtube.commentsToday = getCaps().youtube.count
     logger.info('Daily caps reset')
   })

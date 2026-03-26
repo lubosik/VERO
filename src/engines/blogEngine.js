@@ -4,6 +4,7 @@ import { fetchKeywordIdeas } from '../services/dataforseo.js'
 import { generateWithSearch } from '../services/llm.js'
 import { sendTelegramDocument, sendTelegramMessage } from '../services/telegram.js'
 import { logger } from '../utils/logger.js'
+import { trackMetric } from '../utils/runtimeMetrics.js'
 
 const SEED_KEYWORDS = [
   'BPC-157 protocol',
@@ -75,6 +76,7 @@ async function pickKeywords() {
 
 export async function runBlogEngine() {
   try {
+    trackMetric('blog', { processed: 1 })
     const keywords = await pickKeywords()
     if (keywords.length < 3) {
       logger.info('Not enough keywords available for blog run')
@@ -181,10 +183,12 @@ Preview:
     )
 
     await sendTelegramDocument(html, `${slug || 'blog-draft'}.html`, `Preview: ${title}`)
+    trackMetric('blog', { queued: 1, lastItem: { id: draft.id, title, url: slug ? `/${slug}` : '' } })
     global.runtimeState ||= { health: { lastRuns: {}, errors: [] }, stats: {} }
     global.runtimeState.health.lastRuns.blog = new Date().toISOString()
   } catch (error) {
     logger.error(`Blog engine failed: ${error.message}`)
+    trackMetric('blog', { errors: 1, lastError: error.message })
     global.runtimeState ||= { health: { lastRuns: {}, errors: [] }, stats: {} }
     global.runtimeState.health.errors.unshift({ engine: 'blog', message: error.message, at: new Date().toISOString() })
   }
