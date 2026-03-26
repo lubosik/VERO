@@ -14,6 +14,7 @@ export const config = {
   YOUTUBE_API_KEY: requireEnv('YOUTUBE_API_KEY'),
   YOUTUBE_OAUTH_CLIENT_ID: requireEnv('YOUTUBE_OAUTH_CLIENT_ID'),
   YOUTUBE_OAUTH_CLIENT_SECRET: requireEnv('YOUTUBE_OAUTH_CLIENT_SECRET'),
+  YOUTUBE_OAUTH_REDIRECT_URI: requireEnv('YOUTUBE_OAUTH_REDIRECT_URI', 'http://localhost:3001/oauth/callback'),
   YOUTUBE_OAUTH_REFRESH_TOKEN: requireEnv('YOUTUBE_OAUTH_REFRESH_TOKEN'),
   OPENAI_API_KEY: requireEnv('OPENAI_API_KEY'),
   TELEGRAM_BOT_TOKEN: requireEnv('TELEGRAM_BOT_TOKEN'),
@@ -25,20 +26,8 @@ export const config = {
   APIFY_API_KEY: requireEnv('APIFY_API_KEY'),
   DASHBOARD_PORT: Number(requireEnv('DASHBOARD_PORT', requireEnv('PORT', '3000'))),
   DASHBOARD_SECRET: requireEnv('DASHBOARD_SECRET'),
-  REDDIT_CLIENT_ID: requireEnv('REDDIT_CLIENT_ID'),
-  REDDIT_CLIENT_SECRET: requireEnv('REDDIT_CLIENT_SECRET'),
   REDDIT_USERNAME: requireEnv('REDDIT_USERNAME'),
-  REDDIT_PASSWORD: requireEnv('REDDIT_PASSWORD'),
   BRAND_URL: requireEnv('BRAND_URL'),
   CONSULT_URL: requireEnv('CONSULT_URL'),
   GUIDE_URL: requireEnv('GUIDE_URL')
-}
-
-export function hasRedditApiCredentials() {
-  return Boolean(
-    config.REDDIT_CLIENT_ID &&
-      config.REDDIT_CLIENT_SECRET &&
-      config.REDDIT_USERNAME &&
-      config.REDDIT_PASSWORD
-  )
 }

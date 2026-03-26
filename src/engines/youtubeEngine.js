@@ -112,75 +112,84 @@ export async function runYouTubeEngine() {
     return
   }
 
-  for (const query of SEARCH_QUERIES) {
-    const results = await searchVideos(query, 5)
+  try {
+    for (const query of SEARCH_QUERIES) {
+      const results = await searchVideos(query, 5)
 
-    for (const video of results) {
-      const videoId = video.id?.videoId
-      if (!videoId) continue
-      if (await hasExistingComment({ platform: 'youtube', videoId })) continue
+      for (const video of results) {
+        const videoId = video.id?.videoId
+        if (!videoId) continue
+        if (await hasExistingComment({ platform: 'youtube', videoId })) continue
 
-      const detail = await getVideoDetails(videoId)
-      const score = scoreVideo(video, detail)
-      if (score < 55) continue
+        const detail = await getVideoDetails(videoId)
+        const score = scoreVideo(video, detail)
+        if (score < 55) continue
 
-      const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
-      const scrapedComments = await scrapeYouTubeComments(videoUrl, 150)
-      const commentContext = formatCommentsForPrompt(scrapedComments, 20)
-      const knowledgeContext = await searchKnowledgeBase(
-        [
-          detail?.snippet?.title || video.snippet?.title || '',
-          detail?.snippet?.description?.slice(0, 500) || '',
-          query,
-          scrapedComments.slice(0, 5).map((item) => item.text).join(' ')
-        ].join('\n')
-      )
+        const videoUrl = `https://www.youtube.com/watch?v=${videoId}`
+        const scrapedComments = await scrapeYouTubeComments(videoUrl, 150)
+        const commentContext = formatCommentsForPrompt(scrapedComments, 20)
+        const knowledgeContext = await searchKnowledgeBase(
+          [
+            detail?.snippet?.title || video.snippet?.title || '',
+            detail?.snippet?.description?.slice(0, 500) || '',
+            query,
+            scrapedComments.slice(0, 5).map((item) => item.text).join(' ')
+          ].join('\n')
+        )
 
-      const comment = await generateWithSearch(
-        buildPrompt({
-          video,
-          detail,
-          knowledgeContext,
-          commentContext,
-          guideUrl: process.env.GUIDE_URL
-        }),
-        { temperature: 0.6, maxOutputTokens: 1024 }
-      )
+        const comment = await generateWithSearch(
+          buildPrompt({
+            video,
+            detail,
+            knowledgeContext,
+            commentContext,
+            guideUrl: process.env.GUIDE_URL
+          }),
+          { temperature: 0.6, maxOutputTokens: 1024 }
+        )
 
-      const naturalness = await passesNaturalness(comment)
-      if ((naturalness.score || 0) < 7) continue
+        const naturalness = await passesNaturalness(comment)
+        if ((naturalness.score || 0) < 7) continue
 
-      try {
-        const posted = await postComment(videoId, comment)
-        await logComment({
-          platform: 'youtube',
-          video_id: videoId,
-          channel_id: video.snippet?.channelId,
-          content_title: detail?.snippet?.title || video.snippet?.title,
-          comment_text: comment,
-          naturalness_score: naturalness.score,
-          status: 'posted',
-          external_id: posted?.id || videoId,
-          metadata: { score, query, naturalness, videoUrl },
-          created_at: new Date().toISOString()
-        })
+        try {
+          const posted = await postComment(videoId, comment)
+          await logComment({
+            platform: 'youtube',
+            video_id: videoId,
+            channel_id: video.snippet?.channelId,
+            content_title: detail?.snippet?.title || video.snippet?.title,
+            comment_text: comment,
+            naturalness_score: naturalness.score,
+            status: 'posted',
+            external_id: posted?.id || videoId,
+            metadata: { score, query, naturalness, videoUrl },
+            created_at: new Date().toISOString()
+          })
 
-        global.runtimeState.youtube.commentsToday = commentsToday + 1
-        global.runtimeState.health.lastRuns.youtube = new Date().toISOString()
-        await sendTelegramMessage(`✅ Commented on YouTube\n${detail?.snippet?.title || video.snippet?.title}`)
-        return
-      } catch (error) {
-        global.enginePausedUntil = Date.now() + 1000 * 60 * 60 * 3
-        global.runtimeState.health.errors.unshift({
-          engine: 'youtube',
-          message: error.message,
-          at: new Date().toISOString()
-        })
-        await sendTelegramMessage(`⚠️ YouTube API error. Pausing for 3 hours.\n${error.message}`)
-        logger.error(`YouTube engine failed: ${error.message}`)
-        return
+          global.runtimeState.youtube.commentsToday = commentsToday + 1
+          global.runtimeState.health.lastRuns.youtube = new Date().toISOString()
+          await sendTelegramMessage(`✅ Commented on YouTube\n${detail?.snippet?.title || video.snippet?.title}`)
+          return
+        } catch (error) {
+          global.enginePausedUntil = Date.now() + 1000 * 60 * 60 * 3
+          global.runtimeState.health.errors.unshift({
+            engine: 'youtube',
+            message: error.message,
+            at: new Date().toISOString()
+          })
+          await sendTelegramMessage(`⚠️ YouTube API error. Pausing for 3 hours.\n${error.message}`)
+          logger.error(`YouTube engine failed: ${error.message}`)
+          return
+        }
       }
     }
+  } catch (error) {
+    const message = String(error?.message || error)
+    if (/invalid_client/i.test(message)) {
+      global.enginePausedUntil = Date.now() + 1000 * 60 * 60 * 12
+      await sendTelegramMessage('⚠️ YouTube OAuth refresh failed with invalid_client. Check the OAuth client ID, secret, redirect URI, and refresh token in Railway. YouTube engine paused for 12 hours.')
+    }
+    throw error
   }
 
   global.runtimeState.health.lastRuns.youtube = new Date().toISOString()

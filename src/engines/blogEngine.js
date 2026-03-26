@@ -160,12 +160,19 @@ Output ONLY the HTML. Nothing else.`, { temperature: 1, maxOutputTokens: 4096, t
     if (error) throw error
 
     await sendTelegramMessage(
-      `📝 New Blog Ready — VERO\n\nTitle: ${title}\nKeyword: ${primary.keyword} (${primary.search_volume}/mo searches)\nWords: ~${wordCount}\nSlug: /${slug}\n\n"${html.replace(/<[^>]+>/g, ' ').trim().slice(0, 350)}..."`,
+      `📝 Blog ready for review
+
+Title: ${title}
+Keyword: ${primary.keyword} (${primary.search_volume}/mo)
+Words: ~${wordCount}
+
+Preview:
+"${html.replace(/<[^>]+>/g, ' ').trim().slice(0, 400)}..."`,
       {
         reply_markup: {
           inline_keyboard: [[
-            { text: '✅ Publish', callback_data: `blog_approve_${draft.id}` },
-            { text: '📄 Full Preview', callback_data: `blog_preview_${draft.id}` },
+            { text: '✅ Approve and Publish', callback_data: `blog_approve_${draft.id}` },
+            { text: '📝 Edit and Resubmit', callback_data: `blog_edit_${draft.id}` },
             { text: '❌ Reject', callback_data: `blog_reject_${draft.id}` }
           ]]
         }

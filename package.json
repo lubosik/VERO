@@ -2,6 +2,9 @@
   "name": "vero",
   "version": "3.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "start": "node src/bootstrap.js",
     "pm2": "pm2 start ecosystem.config.cjs",

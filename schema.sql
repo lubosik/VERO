@@ -47,6 +47,14 @@ WHERE
 CREATE UNIQUE INDEX IF NOT EXISTS scanned_content_external_id_uniq
 ON scanned_content (external_id);
 
+CREATE TABLE IF NOT EXISTS seen_authors (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  platform TEXT NOT NULL,
+  username TEXT NOT NULL,
+  first_seen TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(platform, username)
+);
+
 ALTER TABLE blog_drafts
   ADD COLUMN IF NOT EXISTS content_html TEXT,
   ADD COLUMN IF NOT EXISTS secondary_keywords TEXT[],

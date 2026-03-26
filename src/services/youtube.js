@@ -4,7 +4,7 @@ import { config } from '../config.js'
 const oauth2Client = new google.auth.OAuth2(
   config.YOUTUBE_OAUTH_CLIENT_ID,
   config.YOUTUBE_OAUTH_CLIENT_SECRET,
-  'urn:ietf:wg:oauth:2.0:oob'
+  config.YOUTUBE_OAUTH_REDIRECT_URI
 )
 
 if (config.YOUTUBE_OAUTH_REFRESH_TOKEN) {

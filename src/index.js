@@ -49,7 +49,7 @@ async function main() {
     }
   })
 
-  cron.schedule('0 * * * *', async () => {
+  cron.schedule('*/45 * * * *', async () => {
     await safeRun('reddit', runRedditMonitor)
   })
 
