@@ -250,7 +250,9 @@ async function handleKbSubmit(event) {
 
   const data = await res.json()
   if (!res.ok) throw new Error(data.error || 'Ingest failed')
-  document.getElementById('kb-result').textContent = `Loaded ${data.wordCount} words into ${data.chunkCount || 0} chunks`
+  document.getElementById('kb-result').textContent = data.warning
+    ? `Loaded ${data.wordCount} words into ${data.chunkCount || 0} chunks. ${data.warning}`
+    : `Loaded ${data.wordCount} words into ${data.chunkCount || 0} chunks`
   event.target.reset()
   updateFilePreview()
   await loadDashboard()

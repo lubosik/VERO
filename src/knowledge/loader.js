@@ -16,6 +16,23 @@ function normalizeText(text) {
   return text.replace(/\s+/g, ' ').trim()
 }
 
+function scoreLexicalMatch(query, content) {
+  const queryTerms = new Set(
+    normalizeText(query)
+      .toLowerCase()
+      .split(/\W+/)
+      .filter((term) => term.length > 2)
+  )
+  if (!queryTerms.size) return 0
+
+  const haystack = normalizeText(content).toLowerCase()
+  let matches = 0
+  for (const term of queryTerms) {
+    if (haystack.includes(term)) matches += 1
+  }
+  return matches / queryTerms.size
+}
+
 function chunkText(rawContent) {
   const words = normalizeText(rawContent).split(/\s+/)
   const chunks = []
@@ -35,16 +52,28 @@ function chunkText(rawContent) {
 async function replaceDocumentChunks(docId, rawContent) {
   const chunks = chunkText(rawContent)
   if (!chunks.length) return 0
+  let embeddings = null
 
-  const embeddings = await embedTexts(chunks, 'passage')
+  try {
+    embeddings = await embedTexts(chunks, 'passage')
+  } catch (error) {
+    logger.warn(`Chunk embedding failed for doc ${docId}; storing lexical-only chunks: ${error.message}`)
+  }
 
-  const rows = chunks.map((content, index) => ({
-    doc_id: docId,
-    chunk_index: index,
-    content,
-    token_estimate: Math.ceil(content.split(/\s+/).length * 1.35),
-    embedding: toVectorLiteral(embeddings[index])
-  }))
+  const rows = chunks.map((content, index) => {
+    const row = {
+      doc_id: docId,
+      chunk_index: index,
+      content,
+      token_estimate: Math.ceil(content.split(/\s+/).length * 1.35)
+    }
+
+    if (embeddings?.[index]) {
+      row.embedding = toVectorLiteral(embeddings[index])
+    }
+
+    return row
+  })
 
   const { error: deleteError } = await supabase.from('knowledge_chunks').delete().eq('doc_id', docId)
   if (deleteError && !String(deleteError.message || '').includes('knowledge_chunks')) throw deleteError
@@ -157,6 +186,35 @@ export async function searchKnowledgeBase(query, limit = 6) {
     logger.warn(`Semantic KB search failed, falling back to cached docs: ${error.message}`)
   }
 
+  try {
+    const { data: chunks, error } = await supabase
+      .from('knowledge_chunks')
+      .select('content')
+      .limit(200)
+
+    if (error) throw error
+
+    const ranked = (chunks || [])
+      .map((item) => ({
+        content: item.content,
+        lexicalScore: scoreLexicalMatch(query, item.content)
+      }))
+      .filter((item) => item.lexicalScore > 0)
+      .sort((a, b) => b.lexicalScore - a.lexicalScore)
+      .slice(0, limit)
+
+    if (ranked.length) {
+      return ranked
+        .map(
+          (item, index) =>
+            `[KB ${index + 1} | lexical ${item.lexicalScore.toFixed(2)}]\n${item.content}`
+        )
+        .join('\n\n')
+    }
+  } catch (error) {
+    logger.warn(`Lexical KB fallback failed: ${error.message}`)
+  }
+
   return loadKnowledgeBase()
 }
 
@@ -207,12 +265,18 @@ export async function ingestDocument({ name, sourceType, sourceUrl, buffer }) {
   }
 
   let chunkCount = 0
+  let indexingWarning = null
   if (inserted?.id) {
-    chunkCount = await replaceDocumentChunks(inserted.id, rawContent)
+    try {
+      chunkCount = await replaceDocumentChunks(inserted.id, rawContent)
+    } catch (error) {
+      indexingWarning = `Document saved, but chunk indexing failed: ${error.message}`
+      logger.warn(indexingWarning)
+    }
   }
 
   cachedKB = null
   lastLoaded = null
   await loadKnowledgeBase(true)
-  return { wordCount, chunkCount }
+  return { wordCount, chunkCount, warning: indexingWarning }
 }
