@@ -235,6 +235,12 @@ textarea:focus {
   padding: 28px;
 }
 
+.dashboard-version {
+  margin-top: 18px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 .topbar {
   display: flex;
   justify-content: space-between;

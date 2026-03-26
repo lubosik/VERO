@@ -28,8 +28,9 @@ async function main() {
     health: { lastRuns: {}, errors: [] }
   }
   global.enginePausedUntil = 0
+  const version = process.env.RAILWAY_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || 'local'
 
-  logger.info('VERO starting up...')
+  logger.info(`VERO starting up... version=${version}`)
   await startDashboard()
 
   await safeRun('knowledge-base', async () => {

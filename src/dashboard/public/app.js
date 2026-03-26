@@ -207,14 +207,15 @@ function renderHealth(health) {
 }
 
 async function loadDashboard() {
-  const [stats, comments, blogs, keywords, kb, redditQueue, health] = await Promise.all([
+  const [stats, comments, blogs, keywords, kb, redditQueue, health, version] = await Promise.all([
     api('/api/stats'),
     api('/api/comments?limit=25&offset=0'),
     api('/api/blogs'),
     api('/api/keywords'),
     api('/api/kb'),
     api('/api/reddit-queue'),
-    api('/api/health')
+    api('/api/health'),
+    api('/api/version')
   ])
 
   renderStats(stats)
@@ -225,6 +226,7 @@ async function loadDashboard() {
   renderReddit(redditQueue)
   renderHealth(health)
   renderEngineStatus(health)
+  document.getElementById('dashboard-version').textContent = `version: ${version.version}`
 }
 
 function setKbTab(tab) {

@@ -54,6 +54,12 @@ export async function startDashboard() {
     res.json(await getStats())
   })
 
+  app.get('/api/version', async (_req, res) => {
+    res.json({
+      version: process.env.RAILWAY_GIT_COMMIT_SHA || process.env.VERCEL_GIT_COMMIT_SHA || 'local'
+    })
+  })
+
   app.get('/api/comments', async (req, res) => {
     const limit = Number(req.query.limit || 50)
     const offset = Number(req.query.offset || 0)
