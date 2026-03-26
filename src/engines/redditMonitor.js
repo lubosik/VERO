@@ -2,7 +2,7 @@ import axios from 'axios'
 import { hasRedditApiCredentials } from '../config.js'
 import { supabase } from '../db/supabase.js'
 import { searchKnowledgeBase } from '../knowledge/loader.js'
-import { generateText } from '../services/gemini.js'
+import { generateWithSearch } from '../services/llm.js'
 import { sendTelegramMessage } from '../services/telegram.js'
 import { hasExistingComment } from '../utils/dedup.js'
 import { logger } from '../utils/logger.js'
@@ -89,9 +89,9 @@ export async function runRedditMonitor() {
           8
         )
 
-        const generatedComment = await generateText(
+        const generatedComment = await generateWithSearch(
           buildPrompt({ post, subreddit, knowledgeContext }),
-          { temperature: 0.8, maxOutputTokens: 500 }
+          { temperature: 0.6, maxOutputTokens: 1024 }
         )
 
         await supabase.from('scanned_content').upsert({

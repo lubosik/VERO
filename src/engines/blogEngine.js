@@ -1,7 +1,7 @@
 import { supabase } from '../db/supabase.js'
 import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { fetchKeywordIdeas } from '../services/dataforseo.js'
-import { generateText } from '../services/gemini.js'
+import { generateWithSearch } from '../services/llm.js'
 import { sendTelegramDocument, sendTelegramMessage } from '../services/telegram.js'
 import { logger } from '../utils/logger.js'
 
@@ -86,7 +86,7 @@ export async function runBlogEngine() {
       10
     )
 
-    const html = await generateText(`You are an expert peptide researcher writing a blog post for Vici Peptides (vicipeptides.com).
+    const html = await generateWithSearch(`You are an expert peptide researcher writing a blog post for Vici Peptides (vicipeptides.com).
 You have web search access — use it to find recent studies, news, or data not in the knowledge base.
 
 Primary keyword: ${primary.keyword}
@@ -135,7 +135,7 @@ Write a comprehensive, educational blog post. Output as HTML article body only.
 </article>
 
 SEO rules: primary keyword in H1, first 100 words, 2+ H2s, conclusion. No stuffing.
-Output ONLY the HTML. Nothing else.`, { temperature: 0.75, maxOutputTokens: 4096 })
+Output ONLY the HTML. Nothing else.`, { temperature: 1, maxOutputTokens: 4096, thinking: true })
 
     const { metaDescription, slug, title } = parseMeta(html)
     const wordCount = html.replace(/<[^>]+>/g, ' ').trim().split(/\s+/).length

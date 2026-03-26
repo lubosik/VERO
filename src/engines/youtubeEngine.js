@@ -1,6 +1,6 @@
 import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { scrapeYouTubeComments, formatCommentsForPrompt } from '../services/apify.js'
-import { generateJson, generateText } from '../services/gemini.js'
+import { checkNaturalness, generateWithSearch } from '../services/llm.js'
 import { sendTelegramMessage } from '../services/telegram.js'
 import { getVideoDetails, postComment, searchVideos } from '../services/youtube.js'
 import { hasExistingComment, logComment } from '../utils/dedup.js'
@@ -100,10 +100,7 @@ Output ONLY the comment text.`
 }
 
 async function passesNaturalness(comment) {
-  const result = await generateJson(`Does this YouTube comment from a brand account sound genuinely helpful and human, or does it read like promotional/AI copy?
-Comment: "${comment}"
-Respond ONLY with JSON: {"score": <1-10>, "reason": "<brief>"}`)
-  return result
+  return checkNaturalness(comment, 'youtube')
 }
 
 export async function runYouTubeEngine() {
@@ -143,7 +140,7 @@ export async function runYouTubeEngine() {
         ].join('\n')
       )
 
-      const comment = await generateText(
+      const comment = await generateWithSearch(
         buildPrompt({
           video,
           detail,
@@ -151,7 +148,7 @@ export async function runYouTubeEngine() {
           commentContext,
           guideUrl: process.env.GUIDE_URL
         }),
-        { temperature: 0.8, maxOutputTokens: 400 }
+        { temperature: 0.6, maxOutputTokens: 1024 }
       )
 
       const naturalness = await passesNaturalness(comment)
