@@ -50,7 +50,10 @@
             <p>Vici Engagement &amp; Research Operator</p>
           </div>
         </div>
-        <div class="status-dots" id="engine-status"></div>
+        <div class="topbar-actions">
+          <div class="status-dots" id="engine-status"></div>
+          <button id="sign-out-btn" class="ghost-btn" type="button">Sign Out</button>
+        </div>
       </header>
 
       <main class="layout">
@@ -92,6 +95,7 @@
                     <input id="kb-file" type="file" accept=".pdf,.txt" />
                     <span>Drop PDF/TXT here or click to choose</span>
                   </label>
+                  <div id="kb-file-preview" class="file-preview muted">No file selected</div>
                 </div>
                 <div class="tab-panel" data-panel="url">
                   <input id="kb-url" type="url" placeholder="https://example.com/article" />

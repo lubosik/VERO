@@ -12,6 +12,11 @@ function setStoredToken(token) {
   authToken = token
 }
 
+function clearStoredToken() {
+  sessionStorage.removeItem(STORAGE_KEY)
+  authToken = null
+}
+
 async function api(path, options = {}) {
   const res = await fetch(path, {
     ...options,
@@ -213,6 +218,13 @@ function setKbTab(tab) {
   })
 }
 
+function updateFilePreview() {
+  const file = document.getElementById('kb-file')?.files?.[0]
+  const preview = document.getElementById('kb-file-preview')
+  if (!preview) return
+  preview.textContent = file ? `${file.name} • ${Math.round(file.size / 1024)} KB` : 'No file selected'
+}
+
 async function handleKbSubmit(event) {
   event.preventDefault()
   const form = new FormData()
@@ -239,6 +251,7 @@ async function handleKbSubmit(event) {
   if (!res.ok) throw new Error(data.error || 'Ingest failed')
   document.getElementById('kb-result').textContent = `Loaded ${data.wordCount} words`
   event.target.reset()
+  updateFilePreview()
   await loadDashboard()
 }
 
@@ -293,6 +306,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.tab').forEach((button) => {
     button.addEventListener('click', () => setKbTab(button.dataset.tab))
+  })
+
+  document.getElementById('kb-file')?.addEventListener('change', updateFilePreview)
+  document.getElementById('sign-out-btn')?.addEventListener('click', () => {
+    clearStoredToken()
+    showLogin()
   })
 
   document.getElementById('kb-form')?.addEventListener('submit', async (event) => {

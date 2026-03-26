@@ -243,6 +243,12 @@ textarea:focus {
   margin-bottom: 28px;
 }
 
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .brand-lockup {
   display: flex;
   align-items: center;
@@ -276,6 +282,19 @@ textarea:focus {
   display: flex;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.ghost-btn {
+  border: 1px solid var(--border-light);
+  background: transparent;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ghost-btn:hover {
+  background: var(--card-hover);
 }
 
 .status-pill {
@@ -421,6 +440,15 @@ th {
   display: none;
 }
 
+.file-preview {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 12px;
+}
+
 .table-scroll {
   overflow-x: auto;
 }
@@ -550,5 +578,11 @@ th {
   .topbar {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
   }
 }
