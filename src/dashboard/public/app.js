@@ -151,13 +151,21 @@ function renderKb(items) {
         <td>${item.name}</td>
         <td>${item.source_type}</td>
         <td>${item.word_count || 0}</td>
-        <td>${item.chunk_count || 0}</td>
+        <td>${item.chunk_count || 0}${item.indexed_chunk_count ? ` / ${item.indexed_chunk_count} indexed` : ''}</td>
+        <td>${renderKbStatus(item.indexing_status)}</td>
         <td>${formatDate(item.uploaded_at)}</td>
         <td><button data-toggle-kb="${item.id}">${item.active ? 'On' : 'Off'}</button></td>
         <td><button data-delete-kb="${item.id}">Delete</button></td>
       </tr>`
     )
     .join('')
+}
+
+function renderKbStatus(status) {
+  if (status === 'semantic') return '<span class="badge success">Semantic</span>'
+  if (status === 'lexical_fallback') return '<span class="badge warning">Lexical Fallback</span>'
+  if (status === 'partial') return '<span class="badge warning">Partial</span>'
+  return '<span class="badge">Pending</span>'
 }
 
 function renderReddit(items) {
