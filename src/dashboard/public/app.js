@@ -76,11 +76,21 @@ function truncate(text, length = 120) {
   return text.length > length ? `${text.slice(0, length)}...` : text
 }
 
+function prettifyPlatform(platform) {
+  const map = {
+    youtube: 'YouTube',
+    reddit: 'Reddit',
+    looksmaxxing: 'Looksmaxxing',
+    tiktok: 'TikTok'
+  }
+  return map[String(platform || '').toLowerCase()] || platform || ''
+}
+
 function renderStats(stats) {
   const cards = [
     ['YouTube Comments (24h)', stats.youtubeComments24h],
     ['Blogs Published', stats.blogsPublished],
-    ['Reddit Alerts Pending', stats.redditAlertsPending],
+    ['Manual Alerts Pending', stats.redditAlertsPending],
     ['KB Documents', stats.kbDocuments]
   ]
   document.getElementById('stats-grid').innerHTML = cards
@@ -92,6 +102,8 @@ function renderEngineStatus(health) {
   const entries = [
     ['YouTube', health.lastRuns?.youtube],
     ['Reddit', health.lastRuns?.reddit],
+    ['Looksmaxxing', health.lastRuns?.looksmaxxing],
+    ['TikTok', health.lastRuns?.tiktok],
     ['Blog', health.lastRuns?.blog]
   ]
   document.getElementById('engine-status').innerHTML = entries
@@ -103,7 +115,7 @@ function renderComments(items) {
   document.getElementById('comments-table').innerHTML = items
     .map(
       (item) => `<tr>
-        <td>${item.platform || ''}</td>
+        <td>${prettifyPlatform(item.platform)}</td>
         <td>${truncate(item.content_title || item.video_id || item.external_id, 60)}</td>
         <td>${truncate(item.comment_text || '', 110)}</td>
         <td>${item.naturalness_score || '-'}</td>
@@ -173,6 +185,7 @@ function renderReddit(items) {
         <h3>${item.title}</h3>
         <p>${truncate(item.generated_comment || '', 220)}</p>
         <div class="item-actions">
+          <span class="badge">${prettifyPlatform(item.platform)}</span>
           <span class="badge warning">${item.intent_score || 0}/100 intent</span>
           <button data-copy-comment="${encodeURIComponent(item.generated_comment || '')}">Copy Comment</button>
           <a class="linklike" href="${item.url}" target="_blank" rel="noreferrer">Open Thread</a>
@@ -182,7 +195,7 @@ function renderReddit(items) {
     .join('')
 }
 
-function renderHealth(health) {
+function renderHealth(health, caps) {
   const cards = [
     ['Uptime', `${Math.floor((health.uptime || 0) / 60)} min`],
     ['Paused', health.paused ? 'Yes' : 'No'],
@@ -192,6 +205,19 @@ function renderHealth(health) {
   const summary = cards
     .map(([label, value]) => `<div class="health-card"><div class="stat-label">${label}</div><div class="stat-value" style="font-size:22px">${value}</div></div>`)
     .join('')
+
+  const capCard = `<div class="health-card">
+    <div class="stat-label">Daily Caps</div>
+    <div class="muted">YouTube: ${caps.youtube?.count || 0}/${caps.youtube?.cap || 12}</div>
+    <div class="muted">Reddit: ${caps.reddit?.count || 0}/${caps.reddit?.cap || 20}</div>
+    <div class="muted">Looksmaxxing: ${caps.looksmaxxing?.count || 0}/${caps.looksmaxxing?.cap || 15}</div>
+    <div class="muted">TikTok: ${caps.tiktok?.count || 0}/${caps.tiktok?.cap || 15}</div>
+  </div>`
+
+  const instagramCard = `<div class="health-card">
+    <div class="stat-label">Instagram</div>
+    <div class="muted">${health.instagram || 'Handled via ManyChat (external)'}</div>
+  </div>`
 
   const errors = (health.recentErrors || [])
     .slice(0, 4)
@@ -203,11 +229,11 @@ function renderHealth(health) {
     )
     .join('')
 
-  document.getElementById('health-panel').innerHTML = summary + errors
+  document.getElementById('health-panel').innerHTML = summary + capCard + instagramCard + errors
 }
 
 async function loadDashboard() {
-  const [stats, comments, blogs, keywords, kb, redditQueue, health, version] = await Promise.all([
+  const [stats, comments, blogs, keywords, kb, redditQueue, health, version, caps] = await Promise.all([
     api('/api/stats'),
     api('/api/comments?limit=25&offset=0'),
     api('/api/blogs'),
@@ -215,7 +241,8 @@ async function loadDashboard() {
     api('/api/kb'),
     api('/api/reddit-queue'),
     api('/api/health'),
-    api('/api/version')
+    api('/api/version'),
+    api('/api/caps')
   ])
 
   renderStats(stats)
@@ -224,7 +251,7 @@ async function loadDashboard() {
   renderKeywords(keywords)
   renderKb(kb)
   renderReddit(redditQueue)
-  renderHealth(health)
+  renderHealth(health, caps)
   renderEngineStatus(health)
   document.getElementById('dashboard-version').textContent = `version: ${version.version}`
 }

@@ -3,8 +3,12 @@ import { ensureKnowledgeBaseIndexed, loadKnowledgeBase } from './knowledge/loade
 import { runYouTubeEngine } from './engines/youtubeEngine.js'
 import { runBlogEngine } from './engines/blogEngine.js'
 import { runRedditMonitor } from './engines/redditMonitor.js'
+import { runLooksmaxxMonitor } from './engines/looksmaxxMonitor.js'
+import { runTikTokMonitor } from './engines/tiktokMonitor.js'
 import { startDashboard } from './dashboard/server.js'
 import { initTelegram } from './services/telegram.js'
+import { getTikTokHashtagTrends } from './services/tiktok.js'
+import { getCaps, resetAllCaps } from './utils/dailyCap.js'
 import { logger } from './utils/logger.js'
 
 async function safeRun(name, runner) {
@@ -53,8 +57,26 @@ async function main() {
     await safeRun('reddit', runRedditMonitor)
   })
 
+  cron.schedule('0 * * * *', async () => {
+    await safeRun('looksmaxxing', runLooksmaxxMonitor)
+  })
+
+  cron.schedule('0 */3 * * *', async () => {
+    await safeRun('tiktok', runTikTokMonitor)
+  })
+
+  cron.schedule('0 8 * * 6', async () => {
+    await safeRun('tiktok-trends', getTikTokHashtagTrends)
+  })
+
   cron.schedule('0 9 * * 0', async () => {
     await safeRun('blog', runBlogEngine)
+  })
+
+  cron.schedule('0 0 * * *', async () => {
+    resetAllCaps()
+    global.runtimeState.youtube.commentsToday = getCaps().youtube.count
+    logger.info('Daily caps reset')
   })
 
   logger.info('VERO online.')
@@ -62,6 +84,8 @@ async function main() {
   setTimeout(() => {
     safeRun('youtube', runYouTubeEngine)
     safeRun('reddit', runRedditMonitor)
+    safeRun('looksmaxxing', runLooksmaxxMonitor)
+    safeRun('tiktok', runTikTokMonitor)
   }, 2000)
 }
 

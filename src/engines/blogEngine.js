@@ -36,6 +36,7 @@ async function getCachedKeywords() {
     .from('keywords')
     .select('*')
     .gte('fetched_at', staleDate)
+    .order('trend_score', { ascending: false })
     .order('search_volume', { ascending: false })
 
   if (error) throw error

@@ -184,10 +184,10 @@ Output only the final HTML.`,
   await sendTelegramDocument(regenerated, `${slug || 'blog-draft'}.html`, `Preview: ${title}`)
 }
 
-async function markAuthorsSeen(usernames = []) {
+async function markAuthorsSeen(platform, usernames = []) {
   const rows = usernames
     .filter(Boolean)
-    .map((username) => ({ platform: 'reddit', username }))
+    .map((username) => ({ platform, username }))
 
   if (!rows.length) return
 
@@ -195,22 +195,61 @@ async function markAuthorsSeen(usernames = []) {
   if (error && !String(error.message || '').includes('seen_authors')) throw error
 }
 
-async function handleRedditAction(action, contentId) {
+async function regenerateQueuedComment(row) {
+  const knowledgeContext = await searchKnowledgeBase(
+    [row.title, row.body, JSON.stringify(row.metadata || {})].join('\n'),
+    8
+  )
+
+  return generateWithSearch(
+    `Rewrite this manual outreach comment so it still sounds like a real person on ${row.platform}, but with a fresh angle.
+Never use em dashes in any output. Use commas, periods, or rewrite the sentence instead.
+No bullet points. No numbered lists. Plain natural human writing only.
+
+Title: ${row.title}
+Body: ${row.body}
+Existing metadata: ${JSON.stringify(row.metadata || {})}
+
+Relevant knowledge base:
+${knowledgeContext}
+
+Current comment:
+${row.generated_comment}
+
+Output only the revised comment text.`,
+    { maxOutputTokens: 700 }
+  )
+}
+
+async function handleQueueAction(platform, action, contentId) {
   const { data: row, error } = await supabase
     .from('scanned_content')
     .select('*')
-    .eq('platform', 'reddit')
+    .eq('platform', platform)
     .or(`content_id.eq.${contentId},external_id.eq.${contentId}`)
     .single()
 
   if (error) throw error
 
-  if (action === 'done') {
+  if (action === 'regen') {
+    const regenerated = await regenerateQueuedComment(row)
+    await supabase
+      .from('scanned_content')
+      .update({
+        generated_comment: regenerated,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', row.id)
+    await sendTelegramMessage(`🔄 Regenerated ${platform} comment:\n${regenerated}`)
+    return
+  }
+
+  if (action === 'done' || action === 'posted') {
     const dmTargets = [
       row.metadata?.author,
       ...(row.metadata?.commenter_authors || [])
     ]
-    await markAuthorsSeen(dmTargets)
+    await markAuthorsSeen(platform, dmTargets)
   }
 
   await supabase
@@ -289,8 +328,13 @@ export async function initTelegram() {
       if (data.startsWith('blog_approve_')) await handleApproveBlog(data.replace('blog_approve_', ''))
       if (data.startsWith('blog_reject_')) await handleRejectBlog(data.replace('blog_reject_', ''))
       if (data.startsWith('blog_edit_')) await handleEditBlog(data.replace('blog_edit_', ''))
-      if (data.startsWith('reddit_done_')) await handleRedditAction('done', data.replace('reddit_done_', ''))
-      if (data.startsWith('reddit_skip_')) await handleRedditAction('skip', data.replace('reddit_skip_', ''))
+      if (data.startsWith('reddit_done_')) await handleQueueAction('reddit', 'done', data.replace('reddit_done_', ''))
+      if (data.startsWith('reddit_skip_')) await handleQueueAction('reddit', 'skip', data.replace('reddit_skip_', ''))
+      if (data.startsWith('looksmax_done_')) await handleQueueAction('looksmaxxing', 'done', data.replace('looksmax_done_', ''))
+      if (data.startsWith('looksmax_skip_')) await handleQueueAction('looksmaxxing', 'skip', data.replace('looksmax_skip_', ''))
+      if (data.startsWith('tiktok_posted_')) await handleQueueAction('tiktok', 'posted', data.replace('tiktok_posted_', ''))
+      if (data.startsWith('tiktok_regen_')) await handleQueueAction('tiktok', 'regen', data.replace('tiktok_regen_', ''))
+      if (data.startsWith('tiktok_skip_')) await handleQueueAction('tiktok', 'skip', data.replace('tiktok_skip_', ''))
       await instance.answerCallbackQuery(query.id)
     } catch (error) {
       logger.error(`Telegram callback failed: ${error.message}`)

@@ -4,6 +4,8 @@ import { supabase } from '../db/supabase.js'
 import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { generate, generateWithSearch } from '../services/llm.js'
 import { sendTelegramMessage } from '../services/telegram.js'
+import { canPost, incrementCap, shouldNotifyCap } from '../utils/dailyCap.js'
+import { isRecent } from '../utils/recencyCheck.js'
 import { logger } from '../utils/logger.js'
 
 const REDDIT_HEADERS = { 'User-Agent': 'VERO-Monitor/1.0' }
@@ -39,7 +41,19 @@ const SUBREDDITS = [
   'overcominggravity',
   'veganfitness',
   'LooksmaxingAdvice',
-  'BlackPillScience'
+  'BlackPillScience',
+  'Looksmaxxing',
+  'mewing',
+  'jawsurgery',
+  'malehairadvice',
+  'FTMOver30',
+  'Hairloss',
+  'tressless',
+  'alopecia',
+  'SkincareScienceOG',
+  'AsianMasculinity',
+  'GainIt',
+  'PurplePillDebate'
 ]
 
 const KEYWORDS = [
@@ -55,6 +69,10 @@ const KEYWORDS = [
   'healing peptide', 'fat loss peptide', 'weight loss peptide', 'recovery peptide',
   'skin peptide', 'collagen peptide', 'growth hormone peptide', 'gh peptide',
   'muscle recovery peptide', 'nootropic peptide', 'cognitive peptide'
+  , 'looksmax', 'looksmaxxing', 'hardmax', 'hardmaxxing', 'glowup', 'glow up',
+  'skin quality', 'jawline peptide', 'bone structure', 'facial', 'melanotan tan',
+  'skin texture', 'hair loss peptide', 'hair growth peptide', 'face gains', 'aesthetics',
+  'mewing', 'ascend', 'ascending', 'descending', 'nw scale', 'norwood'
 ]
 
 const QUESTION_PATTERN = /\?$|\b(how|what|which|should i|does anyone|has anyone|looking for|need advice|recommendations)\b/i
@@ -274,6 +292,7 @@ Post preview:
 }
 
 async function queueCommenterLead({ post, subreddit, comment, matchedKeywords, dmText }) {
+  if (!canPost('reddit')) return false
   const postUrl = `https://www.reddit.com${post.permalink}`
   await sendTelegramMessage(
     `🔴 Reddit Lead — r/${subreddit}
@@ -296,10 +315,13 @@ Post preview:
     { onConflict: 'platform,username' }
   )
   if (error && !String(error.message || '').includes('seen_authors')) throw error
+  incrementCap('reddit')
+  return true
 }
 
 async function processCommenterLeads({ post, subreddit, comments, knowledgeContext }) {
   for (const comment of comments.slice(0, 10)) {
+    if (!canPost('reddit')) break
     const matchedKeywords = extractMatchedKeywords(comment.body)
     if (!matchedKeywords.length) continue
     if (!isQuestion(comment.body) && !PAIN_PATTERN.test(comment.body)) continue
@@ -331,12 +353,21 @@ Output only the DM text.`
 export async function runRedditMonitor() {
   global.runtimeState ||= { health: { lastRuns: {}, errors: [] }, stats: {} }
 
+  if (!canPost('reddit')) {
+    if (shouldNotifyCap('reddit')) {
+      await sendTelegramMessage('📊 Daily cap reached: reddit (20 actions). Resuming tomorrow.')
+    }
+    return
+  }
+
   for (const subreddit of SUBREDDITS) {
     try {
       const posts = await fetchSubredditPosts(subreddit)
 
       for (const post of posts) {
+        if (!canPost('reddit')) break
         if (!post?.id || await hasProcessedPost(post.id)) continue
+        if (!isRecent(post.created_utc, 1)) continue
 
         const matchedKeywords = extractMatchedKeywords(`${post.title}\n${post.selftext || ''}`)
         const authorIsNew = !(await hasSeenAuthor(post.author))
@@ -375,6 +406,7 @@ export async function runRedditMonitor() {
           dmText,
           topComments
         })
+        incrementCap('reddit')
 
         await processCommenterLeads({ post, subreddit, comments: topComments, knowledgeContext })
       }

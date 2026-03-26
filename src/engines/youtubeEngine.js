@@ -2,7 +2,9 @@ import { searchKnowledgeBase } from '../knowledge/loader.js'
 import { scrapeYouTubeComments, formatCommentsForPrompt } from '../services/apify.js'
 import { checkNaturalness, generateWithSearch } from '../services/llm.js'
 import { sendTelegramMessage } from '../services/telegram.js'
+import { canPost, incrementCap, shouldNotifyCap } from '../utils/dailyCap.js'
 import { getVideoDetails, postComment, searchVideos } from '../services/youtube.js'
+import { isRecent } from '../utils/recencyCheck.js'
 import { hasExistingComment, logComment } from '../utils/dedup.js'
 import { logger } from '../utils/logger.js'
 
@@ -106,9 +108,11 @@ export async function runYouTubeEngine() {
   }
 
   global.runtimeState ||= { youtube: {}, stats: {}, health: { lastRuns: {}, errors: [] } }
-  const commentsToday = global.runtimeState.youtube.commentsToday || 0
-  if (commentsToday >= 12) {
+  if (!canPost('youtube')) {
     logger.info('YouTube daily limit reached')
+    if (shouldNotifyCap('youtube')) {
+      await sendTelegramMessage('📊 Daily cap reached: youtube (12 actions). Resuming tomorrow.')
+    }
     return
   }
 
@@ -122,6 +126,10 @@ export async function runYouTubeEngine() {
         if (await hasExistingComment({ platform: 'youtube', videoId })) continue
 
         const detail = await getVideoDetails(videoId)
+        if (!isRecent(video.snippet?.publishedAt, 30)) {
+          logger.info(`YouTube: skipped stale video ${videoId}`)
+          continue
+        }
         const score = scoreVideo(video, detail)
         if (score < 55) continue
 
@@ -166,7 +174,8 @@ export async function runYouTubeEngine() {
             created_at: new Date().toISOString()
           })
 
-          global.runtimeState.youtube.commentsToday = commentsToday + 1
+          const capState = incrementCap('youtube')
+          global.runtimeState.youtube.commentsToday = capState.count
           global.runtimeState.health.lastRuns.youtube = new Date().toISOString()
           await sendTelegramMessage(`✅ Commented on YouTube\n${detail?.snippet?.title || video.snippet?.title}`)
           return

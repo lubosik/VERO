@@ -7,6 +7,7 @@ import { config } from '../config.js'
 import { supabase } from '../db/supabase.js'
 import { ingestDocument, loadKnowledgeBase } from '../knowledge/loader.js'
 import { publishBlog } from '../services/wordpress.js'
+import { getCaps } from '../utils/dailyCap.js'
 import { logger } from '../utils/logger.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -28,7 +29,7 @@ async function getStats() {
     await Promise.all([
       supabase.from('comments').select('*', { count: 'exact', head: true }).gte('created_at', new Date(Date.now() - 86400000).toISOString()),
       supabase.from('knowledge_docs').select('*', { count: 'exact', head: true }).eq('active', true),
-      supabase.from('scanned_content').select('*', { count: 'exact', head: true }).eq('platform', 'reddit').eq('acted_on', false),
+      supabase.from('scanned_content').select('*', { count: 'exact', head: true }).in('platform', ['reddit', 'looksmaxxing', 'tiktok']).eq('acted_on', false),
       supabase.from('blog_drafts').select('*', { count: 'exact', head: true }).eq('status', 'pending'),
       supabase.from('blog_drafts').select('*', { count: 'exact', head: true }).eq('status', 'published')
     ])
@@ -63,13 +64,36 @@ export async function startDashboard() {
   app.get('/api/comments', async (req, res) => {
     const limit = Number(req.query.limit || 50)
     const offset = Number(req.query.offset || 0)
-    const { data, error } = await supabase
+    const [{ data: comments, error }, { data: manualQueue, error: queueError }] = await Promise.all([
+      supabase
       .from('comments')
       .select('*')
       .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+      .range(offset, offset + limit - 1),
+      supabase
+        .from('scanned_content')
+        .select('*')
+        .in('platform', ['reddit', 'looksmaxxing', 'tiktok'])
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
+    ])
     if (error) return res.status(500).json({ error: error.message })
-    res.json(data)
+    if (queueError) return res.status(500).json({ error: queueError.message })
+
+    const mappedQueue = (manualQueue || []).map((item) => ({
+      platform: item.platform,
+      content_title: item.title,
+      comment_text: item.generated_comment,
+      naturalness_score: item.intent_score,
+      created_at: item.created_at,
+      status: item.acted_on ? 'acted_on' : 'queued'
+    }))
+
+    const merged = [...(comments || []), ...mappedQueue]
+      .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0))
+      .slice(0, limit)
+
+    res.json(merged)
   })
 
   app.get('/api/blogs', async (_req, res) => {
@@ -156,7 +180,7 @@ export async function startDashboard() {
     const { data, error } = await supabase
       .from('scanned_content')
       .select('*')
-      .eq('platform', 'reddit')
+      .in('platform', ['reddit', 'looksmaxxing'])
       .eq('acted_on', false)
       .order('created_at', { ascending: false })
       .limit(100)
@@ -169,9 +193,14 @@ export async function startDashboard() {
       uptime: process.uptime(),
       paused: Boolean(global.enginePausedUntil && global.enginePausedUntil > Date.now()),
       lastRuns: global.runtimeState?.health?.lastRuns || {},
-      youtubeQuotaUsedToday: global.runtimeState?.youtube?.commentsToday || 0,
-      recentErrors: global.runtimeState?.health?.errors?.slice(0, 20) || []
+      youtubeQuotaUsedToday: getCaps().youtube.count,
+      recentErrors: global.runtimeState?.health?.errors?.slice(0, 20) || [],
+      instagram: 'Handled via ManyChat (external)'
     })
+  })
+
+  app.get('/api/caps', async (_req, res) => {
+    res.json(getCaps())
   })
 
   app.post('/api/blog/:id/approve', async (req, res) => {
