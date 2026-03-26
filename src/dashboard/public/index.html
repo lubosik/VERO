@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>VERO Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="splash">
+      <div class="splash-ring">
+        <span>V</span>
+      </div>
+      <div class="splash-brand">
+        <div class="splash-wordmark">VICI</div>
+        <div class="splash-submark">PEPTIDES</div>
+      </div>
+      <div class="splash-divider"></div>
+      <div class="splash-system">Marketing Intelligence</div>
+      <div class="splash-progress">
+        <div id="splash-bar"></div>
+      </div>
+      <div id="splash-status">INITIALISING</div>
+    </div>
+
+    <div id="login-panel">
+      <div id="login-panel-card">
+        <div class="login-logo"><span>V</span></div>
+        <div class="login-wordmark">VICI</div>
+        <div class="login-submark">PEPTIDES</div>
+        <div class="login-divider"></div>
+        <div class="login-label">Marketing Dashboard</div>
+        <form id="login-form">
+          <input id="login-password" type="password" placeholder="Access Key" autocomplete="current-password" />
+          <button id="login-btn" type="submit">Enter</button>
+        </form>
+        <div id="login-error"></div>
+      </div>
+    </div>
+
+    <div id="dashboard">
+      <header class="topbar">
+        <div class="brand-lockup">
+          <div class="brand-mark">V</div>
+          <div>
+            <h1>VERO</h1>
+            <p>Vici Engagement &amp; Research Operator</p>
+          </div>
+        </div>
+        <div class="status-dots" id="engine-status"></div>
+      </header>
+
+      <main class="layout">
+        <section class="stats-grid" id="stats-grid"></section>
+
+        <section class="panel panel-wide">
+          <div class="panel-header">
+            <div>
+              <h2>Knowledge Base Manager</h2>
+              <p>Ingest PDFs, text, URLs, and raw notes. Cache refreshes immediately.</p>
+            </div>
+          </div>
+          <div class="kb-layout">
+            <div class="kb-docs">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Words</th>
+                    <th>Uploaded</th>
+                    <th>Active</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody id="kb-docs"></tbody>
+              </table>
+            </div>
+            <div class="kb-uploader">
+              <div class="tab-row">
+                <button class="tab active" data-tab="file">Upload File</button>
+                <button class="tab" data-tab="url">Fetch URL</button>
+                <button class="tab" data-tab="paste">Paste Text</button>
+              </div>
+              <form id="kb-form">
+                <input id="kb-name" name="name" placeholder="Document Name" required />
+                <div class="tab-panel active" data-panel="file">
+                  <label class="dropzone">
+                    <input id="kb-file" type="file" accept=".pdf,.txt" />
+                    <span>Drop PDF/TXT here or click to choose</span>
+                  </label>
+                </div>
+                <div class="tab-panel" data-panel="url">
+                  <input id="kb-url" type="url" placeholder="https://example.com/article" />
+                </div>
+                <div class="tab-panel" data-panel="paste">
+                  <textarea id="kb-content" rows="10" placeholder="Paste transcript, protocol notes, or research summary"></textarea>
+                </div>
+                <button type="submit" class="primary">Ingest Document</button>
+                <div id="kb-result" class="form-status"></div>
+              </form>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>Live Activity Feed</h2></div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Platform</th>
+                  <th>Title</th>
+                  <th>Preview</th>
+                  <th>Score</th>
+                  <th>Time</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody id="comments-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>Blog Pipeline</h2></div>
+          <div id="blogs-list" class="stack-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>Keyword Intelligence</h2></div>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Keyword</th>
+                  <th>Volume</th>
+                  <th>Trend</th>
+                  <th>Competition</th>
+                  <th>Used</th>
+                </tr>
+              </thead>
+              <tbody id="keywords-table"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>Reddit Queue</h2></div>
+          <div id="reddit-queue" class="stack-list"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header"><h2>System Health</h2></div>
+          <div id="health-panel" class="health-grid"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>

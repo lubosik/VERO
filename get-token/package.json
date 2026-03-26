@@ -1,0 +1,17 @@
+{
+  "name": "get-token",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "get-token.mjs",
+  "scripts": {
+    "start": "node get-token.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "dotenv": "^16.6.1",
+    "googleapis": "^171.4.0"
+  }
+}
