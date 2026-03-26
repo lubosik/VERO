@@ -3,6 +3,7 @@ import * as cheerio from 'cheerio'
 import pdfParse from 'pdf-parse'
 import { supabase } from '../db/supabase.js'
 import { embedQuery, embedTexts, toVectorLiteral } from '../services/embeddings.js'
+import { rerankPassages } from '../services/reranker.js'
 import { logger } from '../utils/logger.js'
 
 let cachedKB = null
@@ -120,17 +121,35 @@ export async function searchKnowledgeBase(query, limit = 6) {
     const embedding = await embedQuery(query)
     const { data, error } = await supabase.rpc('match_knowledge_chunks', {
       query_embedding: toVectorLiteral(embedding),
-      match_count: limit
+      match_count: Math.max(limit * 2, 10)
     })
 
     if (error) throw error
 
     if (data?.length) {
-      return data
-        .filter((item) => Number(item.similarity || 0) > 0.2)
+      let ranked = data.filter((item) => Number(item.similarity || 0) > 0.2)
+
+      try {
+        const reranked = await rerankPassages(
+          query,
+          ranked.map((item) => item.content)
+        )
+
+        ranked = reranked
+          .map((entry) => ({
+            ...ranked[entry.index],
+            rerankScore: entry.score
+          }))
+          .sort((a, b) => Number(b.rerankScore || 0) - Number(a.rerankScore || 0))
+      } catch (error) {
+        logger.warn(`KB reranking failed, using vector order: ${error.message}`)
+      }
+
+      return ranked
+        .slice(0, limit)
         .map(
           (item, index) =>
-            `[KB ${index + 1} | similarity ${Number(item.similarity).toFixed(2)}]\n${item.content}`
+            `[KB ${index + 1} | similarity ${Number(item.similarity).toFixed(2)}${item.rerankScore !== undefined ? ` | rerank ${Number(item.rerankScore).toFixed(2)}` : ''}]\n${item.content}`
         )
         .join('\n\n')
     }

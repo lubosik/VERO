@@ -2,7 +2,7 @@ import axios from 'axios'
 import { config } from '../config.js'
 
 const EMBEDDING_MODEL = 'nvidia/llama-nemotron-embed-1b-v2'
-const EMBEDDING_DIMENSIONS = 1024
+const EMBEDDING_DIMENSIONS = 2048
 
 const client = axios.create({
   baseURL: 'https://integrate.api.nvidia.com/v1',

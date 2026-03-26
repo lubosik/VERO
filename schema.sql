@@ -96,7 +96,7 @@ CREATE TABLE IF NOT EXISTS knowledge_chunks (
   chunk_index INTEGER NOT NULL,
   content TEXT NOT NULL,
   token_estimate INTEGER,
-  embedding VECTOR(1024),
+  embedding VECTOR(2048),
   created_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(doc_id, chunk_index)
 );
@@ -110,7 +110,7 @@ USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
 
 CREATE OR REPLACE FUNCTION match_knowledge_chunks(
-  query_embedding VECTOR(1024),
+  query_embedding VECTOR(2048),
   match_count INT DEFAULT 8
 )
 RETURNS TABLE (
