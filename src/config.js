@@ -8,6 +8,7 @@ function requireEnv(name, fallback = '') {
 
 export const config = {
   NODE_ENV: requireEnv('NODE_ENV', 'development'),
+  PORT: Number(requireEnv('PORT', '3000')),
   SUPABASE_URL: requireEnv('SUPABASE_URL'),
   SUPABASE_SERVICE_KEY: requireEnv('SUPABASE_SERVICE_KEY') || requireEnv('SUPABASE_SECRET_KEY'),
   YOUTUBE_API_KEY: requireEnv('YOUTUBE_API_KEY'),
@@ -23,7 +24,7 @@ export const config = {
   WP_APP_PASSWORD: requireEnv('WP_APP_PASSWORD'),
   DATAFORSEO_AUTH: requireEnv('DATAFORSEO_AUTH'),
   APIFY_API_KEY: requireEnv('APIFY_API_KEY'),
-  DASHBOARD_PORT: Number(requireEnv('DASHBOARD_PORT', '3000')),
+  DASHBOARD_PORT: Number(requireEnv('DASHBOARD_PORT', requireEnv('PORT', '3000'))),
   DASHBOARD_SECRET: requireEnv('DASHBOARD_SECRET'),
   REDDIT_CLIENT_ID: requireEnv('REDDIT_CLIENT_ID'),
   REDDIT_CLIENT_SECRET: requireEnv('REDDIT_CLIENT_SECRET'),

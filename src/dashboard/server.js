@@ -186,8 +186,9 @@ export async function startDashboard() {
   })
 
   return new Promise((resolve) => {
-    app.listen(config.DASHBOARD_PORT, () => {
-      logger.info(`Dashboard listening on ${config.DASHBOARD_PORT}`)
+    const port = config.DASHBOARD_PORT || config.PORT
+    app.listen(port, () => {
+      logger.info(`Dashboard listening on ${port}`)
       resolve(app)
     })
   })

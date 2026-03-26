@@ -7,6 +7,20 @@ import { startDashboard } from './dashboard/server.js'
 import { initTelegram } from './services/telegram.js'
 import { logger } from './utils/logger.js'
 
+async function safeRun(name, runner) {
+  try {
+    await runner()
+  } catch (error) {
+    global.runtimeState ||= { youtube: { commentsToday: 0 }, stats: {}, health: { lastRuns: {}, errors: [] } }
+    global.runtimeState.health.errors.unshift({
+      engine: name,
+      message: error.message,
+      at: new Date().toISOString()
+    })
+    logger.error(`${name} run failed: ${error.stack || error.message}`)
+  }
+}
+
 async function main() {
   global.runtimeState = {
     youtube: { commentsToday: 0 },
@@ -16,30 +30,37 @@ async function main() {
   global.enginePausedUntil = 0
 
   logger.info('VERO starting up...')
-  await loadKnowledgeBase()
-  logger.info('Knowledge base ready')
-
-  await initTelegram()
   await startDashboard()
+
+  await safeRun('knowledge-base', async () => {
+    await loadKnowledgeBase()
+    logger.info('Knowledge base ready')
+  })
+
+  await safeRun('telegram', async () => {
+    await initTelegram()
+  })
 
   cron.schedule('0 */2 * * *', async () => {
     if (!global.enginePausedUntil || global.enginePausedUntil <= Date.now()) {
-      await runYouTubeEngine()
+      await safeRun('youtube', runYouTubeEngine)
     }
   })
 
   cron.schedule('0 * * * *', async () => {
-    await runRedditMonitor()
+    await safeRun('reddit', runRedditMonitor)
   })
 
   cron.schedule('0 9 * * 0', async () => {
-    await runBlogEngine()
+    await safeRun('blog', runBlogEngine)
   })
 
-  await runYouTubeEngine()
-  await runRedditMonitor()
-
   logger.info('VERO online.')
+
+  setTimeout(() => {
+    safeRun('youtube', runYouTubeEngine)
+    safeRun('reddit', runRedditMonitor)
+  }, 2000)
 }
 
 main().catch((error) => {
